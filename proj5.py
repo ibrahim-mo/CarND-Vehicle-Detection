@@ -6,11 +6,12 @@ import cv2
 import glob
 import time
 from scipy.ndimage.measurements import label
+from collections import deque
 
 from supp_funcs import *
 
 # load the extracted features from the pickle file
-dist_pickle = pickle.load( open("svc_pickle.p", "rb") )
+dist_pickle = pickle.load( open("svc_pickle-lin.p", "rb") )
 svc = dist_pickle["svc"]
 X_scaler = dist_pickle["scaler"]
 color_space = dist_pickle["color_space"]
@@ -101,7 +102,10 @@ ystop = 656
 # Try different scales
 scales = [1., 1.5, 2.]
 # heat threshold
-heat_thr = 1
+heat_thr = 3
+
+# For storing history of the last N (=5) heatmaps
+history = deque(maxlen = 5)
 
 def img_pipeline(img):
     if not img.any():
@@ -129,8 +133,13 @@ def img_pipeline(img):
     # Visualize the heatmap when displaying    
     heatmap = np.clip(heat, 0, 255)
 
+    # Take average of the last 5 heatmaps
+    history.append(heatmap)
+    avg_heatmap = np.mean(history, axis=0)
+
     # Find final boxes from heatmap using label function
-    labels = label(heatmap)
+    # labels = label(heatmap)
+    labels = label(avg_heatmap)
     draw_img = draw_labeled_bboxes(np.copy(img), labels)
 
     #save frames into files

@@ -4,8 +4,7 @@ import numpy as np
 import glob
 import time
 import pickle
-# from sklearn.svm import LinearSVC
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 
 from supp_funcs import *
@@ -99,6 +98,7 @@ notcar_features = extract_features(notcars, color_space=color_space,
                         hist_feat=hist_feat, hog_feat=hog_feat)
 
 X = np.vstack((car_features, notcar_features)).astype(np.float64)                        
+
 # Fit a per-column scaler
 X_scaler = StandardScaler().fit(X)
 # Apply the scaler to X
@@ -116,11 +116,11 @@ X_train, X_test, y_train, y_test = train_test_split(
 print('Using:',orient,'orientations,',pix_per_cell,
     'pixels per cell, and', cell_per_block,'cells per block')
 print('Feature vector length:', len(X_train[0]))
-# Use a linear SVC 
-# svc = LinearSVC()
 
+# Use a linear SVC 
+svc = LinearSVC()
 # Use C-support SVC with default (RBF) kernel
-svc = SVC()
+# svc = SVC()
 
 # Check the training time for the SVC
 t=time.time()
@@ -129,7 +129,6 @@ t2 = time.time()
 print(round(t2-t, 2), 'Seconds to train SVC...')
 # Check the score of the SVC
 print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
-
 
 # Save extracted features into a pickle file.
 dist_pickle = {}
@@ -145,7 +144,7 @@ dist_pickle["hist_bins"] = hist_bins
 # dist_pickle["spatial_feat"] = spatial_feat
 # dist_pickle["hist_feat"] = hist_feat
 # dist_pickle["hog_feat"] = hog_feat
-pickle_file = "svc_pickle.p"
+pickle_file = "svc_pickle-lin.p"
 pickle.dump(dist_pickle, open(pickle_file, "wb"))
 
 print('Saved extracted features to file', pickle_file)

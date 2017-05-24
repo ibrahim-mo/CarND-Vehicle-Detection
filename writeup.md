@@ -19,11 +19,12 @@ The goals / steps of this project are the following:
 [image1]: ./output_images/car_nocar.png
 [image2]: ./output_images/hog_y_chan.png
 [image3]: ./output_images/hog_sub.png
-[image4]: ./output_images/test6_boxes.png
+[image4]: ./output_images/ex_boxes.png
 [image5]: ./output_images/heat_fig.png
-[image6]: ./output_images/labels_map.png
-[image7]: ./output_images/output_bboxes.png
+[image6]: ./output_images/avg_labels.png
+[image7]: ./output_images/avg_boxes.png
 [video1]: ./project_video.mp4
+[video2]: ./project_video-rbf.mp4
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/513/view) Points
 ### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
@@ -42,7 +43,7 @@ You're reading it!
 
 First, I extracted a selected set of features from the training images (`vehicles` and `non-vehicles`), then ran a classifier on them, and finally saved the parameters and trained classifier to a pickle file. I wrote a separate file for this step, and called it `extract_features.py`.
 
-The code for extracting the features (of both cars and not-cars) is contained at lines 37 through 100 of the file `extract_features.py`. The function `extract_features()` (defined at lines 37 to 81 of the file) calls support functions which I defined in another file called 'supp_funcs.py'. I did this because I will need some of these lower-level functions again in the next steps (for vehicle detection and tracking).
+The code for extracting the features (of both cars and not-cars) is contained at lines 37 through 100 of the file `extract_features.py`. The function `extract_features()` (defined at lines 37 to 81 of the file) calls support functions which I defined in another file called `supp_funcs.py`. I did this because I will need some of these lower-level functions again in the next steps (for vehicle detection and tracking).
 
 I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
 
@@ -94,11 +95,11 @@ image = (image*255).astype(np.uint8)
 
 After extracting the concatenated features, I normalized them with the `scikit-learn`'s `StandardScaler()`, which standardizes the combined image features with zero mean and unit variance.
 
-Then, I chose the SVM classifier, but tried three different kernels: `LinearSVC()`, `SVC()` with default `kernel='rbf'`, and `SVC(kernel='poly')` with default `degree=3`. I found that the linear SVC was the fastest of the three, the polynomial SVC was extremely slow (crashed or ran out of memory after several hours), and the RBF SVC was in between (finished after several hours).
+Then, I chose the SVM classifier, but tried three different kernels: `LinearSVC()`, `SVC()` with default `kernel='rbf'`, and `SVC(kernel='poly')` with default `degree=3`. I found that the linear SVC was the fastest of the three, the polynomial SVC was extremely slow (crashed or ran out of memory after several hours), and the RBF SVC was in between but it was still very slow (more than 20 times slower than `LinearSVC()`, although I ran it on a t2.txlarge AWS instance).
 
-I finally chose the extracted features trained with the RBT SVM classifier (`svm.SVC()` default) over the Linear SVM classifier (`svm.LinearSVC()`), as it produced better prediction results (which showed in the output video).
+I finally chose to train the extracted features with the Linear SVM classifier (`LinearSVC()`), although the RBF-kernel SVM classifier (default `SVC()`) did slightly better on examples images and the test video, but due to speed it was not practical to experiment with it within a reasonable amount of time.
 
-The code for normalizing the image features and training the SVC classifier is at lines 103 through 124 of file `extract_features.py`
+The code for normalizing the image features and training the Linear SVC classifier is at lines 102 through 131 of file `extract_features.py`
 
 
 ### Sliding Window Search
@@ -122,11 +123,11 @@ Here's an example of an image after applying the sliding window search (with hog
 
 ![alt text][image3]
 
-The code for the sliding window implementation is defined in the function `find_cars()` at lines 25 through 97 in the file `proj5.py`. Similar to what was done earlier, this function calls lower-level functions defined in the file `supp_funcs.py()` (at lines 7 to 55).
+The code for the sliding window implementation is defined in the function `find_cars()` at lines 26 through 98 in the file `proj5.py`. Similar to what was done earlier, this function calls lower-level functions defined in the file `supp_funcs.py()` (at lines 7 to 55).
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Ultimately I searched on three scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are an example image:
+Ultimately I searched on three scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
 
 ![alt text][image4]
 
@@ -140,23 +141,21 @@ Here's a [link to my video result](./output_video.mp4)
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video, using multiple scale factors (`[1.0, 1.5, 2.0]).  From the positive detections, I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.
+I recorded the positions of positive detections in each frame of the video, using multiple scale factors (`[1.0, 1.5, 2.0]`).  From the positive detections, I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.
 
-Here's an example result showing the heatmaps from four consecutive frames of the video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on one of the sample frames:
+Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
 
-### Here is a sample of four consecutive frames and their corresponding heatmaps:
+### Here are five frames and their corresponding heatmaps:
 
 ![alt text][image5]
 
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all the chosen frame scales:
+### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all five frames:
 ![alt text][image6]
 
-### Here are the resulting bounding boxes are drawn onto the last frame in the series:
+### Here the resulting bounding boxes are drawn onto the last frame in the series:
 ![alt text][image7]
 
-This image pipeline for creating video frames is defined by the function `img_pipeline()` at lines 106 through 140 of the file `proj5.py`.
-
-I thought about combining bounding boxes from multiple video frames to smooth them out, but found that to be unnecessary with the better results I got using the RBF SVM classifier (instead of the Linear SVM), however, the Linear SVM is much faster. 
+This image pipeline for creating video frames is defined by the function `img_pipeline()` at lines 110 through 149 of the file `proj5.py`.
 
 ---
 
@@ -166,14 +165,16 @@ I thought about combining bounding boxes from multiple video frames to smooth th
 
 Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.
 
-I noticed that my pipeline worked well with cars that are closer (as they appear bigger), but it didn't do well finding cars that are far at the horizon. It's still safe, but ideally it wound be nicer to discover more cars (like humans!). I think a more powerful classifier like deep neural network can be more robust.
+I tried multiple techniques during feature extraction like selecting a good color scheme such as YCrCb, and combining multiple features like HOG channels, color histograms, and spacial binning. I normalized the features before training, then used an SVM classifier. 
 
-I tried multiple techniques during feature extraction like selecting a good color scheme such as YCrCb, and combine multiple features like HOG channels, color histograms, and spacial binning. I normalized the features before training, then used an SVM classifier. 
+I did several steps experimenting with the linear SVM classifier. The good thing is that it was much faster than the other SVC kernels, hence I had the chance to run multiple rounds with different combination of parameters, color schemes, and hog channels, as well as window scaling factors. Another SVC() classifier, such as RBF-kernel SVC, could do better but it was extremely slow, and hence not practical to train and experiement with it in a reasonable amount of time.
 
-I did severAL steps experimenting with the linear SVM classifier. The good thing is that it was super fast, hence I had the chance to run multiple rounds with different combination of parameters, color schemes, and hog channels, as well as window scaling factors. However, I wasn't happy with its final outcome, as I can see the bounding boxes fluctuate a lot and makes the video looks ugly, in addition to some erroneous boxes that sometimes appear right in front of the car (i.e., not safe). Finally, I decided to gave the RBF SVM a try (after settling on a nice combination of the other parameters), and found it did better than the linear SVM classifier, however it was time consuming so I run it only once on the project video (after a few runs on the test video).
+I used a sliding window technique along with an efficient subsampling method to find cars in each video frame, and extract features only once per image, then subsample the features for overlapping windows using different scales for a better search. Then I used a labeling method to find groups of pixels (car candidate locations) from all the bounding boxes, and did filtering with a small threshold (to reduce false positives). Finally, I kept track of the last five video frames, and took their avergae to draw the boxes on each frame. That simple technique helped provide a somewhat better stabilization of the drawn boxes, as well as reduction in the number of false positives.
 
-I used a sliding window technique along with an efficient subsampling method to find cars in each video frame, and extract features only once per image, then subsample the features for overlapping windows using different scales for a better search. Then I used a labeling method to find groups of pixels (car candidates) from all the bounding boxes, and do filtering a small threshold (to reduce false positives).
+I noticed that my pipeline worked fairly well with cars that are closer (as they appear bigger), but it didn't do well finding cars that are far at the horizon (or appear small). Also, there were a (very) few false positives. Ideally, it wound be nicer to discover all visible cars with no false positives (like humans do!).
 
-One thing I could do in the future is to experiment with other types of classifiers, esp. deep neural networks.
+I already tried a better SVM classifier which is `SVC()` with default RBF kernel (which is much slower than `LinearSVC()`), but at that time I didn't use the frame avergaing method and hence I was asked to resubmit the project with it. Unfotunately, I didn't have sufficient time to create another output video with this method. You can actually check [my RBF-based video here](./output_video-rbf.mp4). It discovered more cars and had no false postivies (without using frame. Also, a deep neural network could be more robust than a linear SVM which is something I could try in the future.
+
+Another nice thing to try in the future is to mix the output of this video with the lane lines produced by the previous project!
 
 Thanks!
